@@ -2,7 +2,7 @@
 
 Calc     staffing for one interval, with the service-level cliff
 What-if  AI containment and assist, pooling, moving agents, chat concurrency
-Sites    every site's clock, hours and daylight-saving shifts
+Sites    every site's clock, hours and daylight-saving shifts; Paste setup link loads your sites
 
 Everything runs on the device; no internet needed.
 """
@@ -10,11 +10,13 @@ Everything runs on the device; no internet needed.
 import json
 import os
 import sys
+import textwrap
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
+import clipboard  # noqa: E402  (Pythonista)
 import ui  # noqa: E402  (Pythonista)
 
 from horizon import config, screens  # noqa: E402
@@ -118,6 +120,20 @@ class Row(ui.View):
         self.field.frame = (w * 0.52, 3, w * 0.48, h - 6)
 
 
+class ButtonRow(ui.View):
+    """Buttons side by side."""
+
+    def __init__(self, *buttons):
+        self.buttons = buttons
+        for b in buttons:
+            self.add_subview(b)
+
+    def layout(self):
+        w = self.width / len(self.buttons)
+        for i, b in enumerate(self.buttons):
+            b.frame = (i * w, 0, w, self.height)
+
+
 class Tab(ui.View):
     """A scrolling column of views."""
 
@@ -212,9 +228,11 @@ class App(ui.View):
 
     def build_sites(self):
         tab = Tab()
-        refresh = ui.Button(title='Refresh', font=('<system-bold>', 15), tint_color=ACCENT)
-        refresh.action = lambda sender: self.update_sites()
-        tab.add(refresh, 32)
+        self.refresh_button = ui.Button(title='Refresh', font=('<system-bold>', 15), tint_color=ACCENT)
+        self.refresh_button.action = lambda sender: self.update_sites()
+        self.paste_button = ui.Button(title='Paste setup link', font=('<system-bold>', 15), tint_color=ACCENT)
+        self.paste_button.action = lambda sender: self.paste_setup()
+        tab.add(ButtonRow(self.refresh_button, self.paste_button), 32)
         self.sites_report = tab.add(mono_label(), lambda: text_height(self.sites_report))
         return tab
 
@@ -280,12 +298,23 @@ class App(ui.View):
         self.remember(rows)
         self.whatif_tab.layout()
 
-    def update_sites(self):
+    def update_sites(self, message=None):
         try:
-            self.sites_report.text = screens.sites(self.cfg if self.cfg.get('_path') else None)
+            text = screens.sites(self.cfg if self.cfg.get('_path') else None)
         except Exception as e:
-            self.sites_report.text = 'Could not read the sites config:\n%s' % e
+            text = 'Could not read the sites config:\n%s' % e
+        self.sites_report.text = message + '\n\n' + text if message else text
         self.sites_tab.layout()
+
+    def paste_setup(self):
+        # The same setup link (or setup code) the web app makes, from the clipboard.
+        try:
+            self.cfg = screens.use_setup(clipboard.get() or '')
+            n = len(self.cfg['sites'])
+            message = 'Loaded %d site%s from your setup link.' % (n, '' if n == 1 else 's')
+        except Exception as e:
+            message = 'That setup link could not be used:\n' + textwrap.fill(str(e), 36)
+        self.update_sites(message)
 
     # TextField delegate: recalculate shortly after typing stops.
     def textfield_did_change(self, textfield):

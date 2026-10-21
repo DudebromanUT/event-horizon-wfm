@@ -1,5 +1,9 @@
+import base64
+import json
 import os
+import shutil
 import sys
+import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 
@@ -75,6 +79,37 @@ class ConfigTest(unittest.TestCase):
         names = [s['name'] for s in cfg['sites']]
         self.assertEqual(len(names), 5)
         self.assertIn('Nairobi', names)
+
+    def test_setup_link(self):
+        cfg = {'note': 'Two sites', 'sites': [
+            {'id': 'SJO', 'name': 'San José', 'zone': 'America/Costa_Rica', 'hours': {'mon-fri': '08:00-20:00'}},
+            {'id': 'KGL', 'name': 'Kigali', 'zone': 'Africa/Kigali', 'hours': {'daily': '24h'}}]}
+        # The web app's encoding: compact JSON as UTF-8, then base64url without padding.
+        compact = json.dumps(cfg, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+        code = base64.urlsafe_b64encode(compact).decode().rstrip('=')
+        for text in ('https://example.github.io/event-horizon-wfm/#setup=' + code,
+                     ' #setup=%s\n%s ' % (code[:40], code[40:]), json.dumps(cfg)):
+            got = config.read_setup(text)
+            self.assertEqual(got['sites'][0]['name'], 'San José')
+            self.assertEqual(got['sites'][1]['_hours'][0], [(0, 1440)])
+        for bad in ('Lunch at noon?', '#setup=!!!', '[1, 2]', '{"sites": []}',
+                    '{"sites": [{"id": "X", "name": "X", "zone": "Mars/Olympus_Mons"}]}'):
+            with self.assertRaises(ValueError):
+                config.read_setup(bad)
+
+    def test_save(self):
+        tmp = tempfile.mkdtemp()
+        try:
+            cfg = config.read_setup('{"sites": [{"id": "SJO", "name": "San José", "zone": "America/Costa_Rica"}]}')
+            path = config.save(cfg, os.path.join(tmp, 'config', 'operation.json'))
+            with open(path, encoding='utf-8') as f:
+                text = f.read()
+            self.assertIn('San José', text)
+            self.assertNotIn('_hours', text)
+            self.assertEqual(config.load(path)['sites'][0]['_hours'][0], [])
+            self.assertEqual(os.listdir(os.path.dirname(path)), ['operation.json'])
+        finally:
+            shutil.rmtree(tmp)
 
     def test_hours(self):
         week = config.parse_hours({'daily': '08:00-20:00', 'sun': 'closed', 'fri': ['08:00-12:00', '13:00-22:00']})

@@ -60,7 +60,9 @@ outbound hours and attempt-cap reach (`horizon/channels.py`).
 Pythonista too. `horizon_app.py` is a basic Pythonista front end, and
 `pythonista/install_event_horizon.py` installs or updates the repository on the phone. It needs no
 token while the repository is public; for a private one it asks once for a read-only token and
-keeps it in the iOS keychain.
+keeps it in the iOS keychain. To load your sites, copy your setup link and tap **Paste setup link**
+on the app's Sites tab (iOS may ask to allow the paste). It saves them as `config/operation.json`,
+which updates leave alone.
 
 ## Tests
 
@@ -101,7 +103,7 @@ copy updates.
 |---|---|
 | `docs/` | The web app. `app/engine.js` and `app/clock.js` are the JavaScript engine; `app/calc.js`, `whatif.js` and `sites.js` are the screens; `sw.js` is generated. |
 | `horizon/` | The Python engine: `erlang.py`, `economics.py`, `whatif.py`, `channels.py`, `clock.py`, `config.py`, `report.py`. |
-| `config/operation.example.json` | The example sites, which also become the web app's starting sites. Copy it to `config/operation.json` (ignored by git) for your own. |
+| `config/operation.example.json` | The example sites, which also become the web app's starting sites. Your own go in `config/operation.json` (ignored by git), which the Pythonista app writes from a setup link. |
 | `scripts/` | `build.py` (generated web files), `golden.py` (cross-check cases), `icons.cjs` (app icons). |
 | `tests/` | Python tests, `web/` cross-checks, `browser/` click-through. |
 

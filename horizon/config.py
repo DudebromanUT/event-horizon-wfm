@@ -2,7 +2,7 @@
 
 The app reads config/operation.json if it exists, otherwise the example next to
 it. operation.json is ignored by git, so your real hours and costs stay on your
-devices.
+devices. A setup link from the web app (...#setup=...) can be saved as operation.json.
 
 Hours are local to each site, 24-hour clock. Keys are day names ('mon'..'sun'),
 ranges ('mon-fri', 'sat-sun') or 'daily'; later keys override earlier ones.
@@ -10,6 +10,7 @@ Values are 'HH:MM-HH:MM', a list of those, 'closed' or '24h'. A range that ends
 at or before it starts runs past midnight ('22:00-06:00').
 """
 
+import base64
 import json
 import os
 from datetime import timedelta
@@ -19,11 +20,11 @@ from .clock import zone
 DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_DIR = os.path.join(ROOT, 'config')
+OPERATION = os.path.join(CONFIG_DIR, 'operation.json')
 
 
 def config_path():
-    mine = os.path.join(CONFIG_DIR, 'operation.json')
-    return mine if os.path.exists(mine) else os.path.join(CONFIG_DIR, 'operation.example.json')
+    return OPERATION if os.path.exists(OPERATION) else os.path.join(CONFIG_DIR, 'operation.example.json')
 
 
 def load(path=None):
@@ -31,13 +32,49 @@ def load(path=None):
     with open(path, encoding='utf-8') as f:
         cfg = json.load(f)
     cfg['_path'] = path
+    return check(cfg, path)
+
+
+def check(cfg, source):
+    """Check every site and add its parsed hours as '_hours'."""
     for site in cfg.get('sites', []):
         for key in ('id', 'name', 'zone'):
             if not site.get(key):
-                raise ValueError('every site needs %r (check %s)' % (key, path))
+                raise ValueError('every site needs %r (check %s)' % (key, source))
         zone(site['zone'])
         site['_hours'] = parse_hours(site.get('hours', {}))
     return cfg
+
+
+def read_setup(text):
+    """The config in a setup link (...#setup=<base64url JSON>) or a setup code (the JSON
+    itself), as the web app makes them."""
+    text = text.strip()
+    at = text.find('#setup=')
+    try:
+        if at >= 0:
+            code = ''.join(text[at + 7:].split())
+            cfg = json.loads(base64.urlsafe_b64decode(code + '=' * (-len(code) % 4)).decode('utf-8'))
+        else:
+            cfg = json.loads(text)
+    except ValueError:
+        raise ValueError('that is not a setup link or setup code') from None
+    if not isinstance(cfg, dict) or not cfg.get('sites'):
+        raise ValueError('that setup link has no sites')
+    return check(cfg, 'the setup link')
+
+
+def save(cfg, path=None):
+    """Write the config to config/operation.json (or `path`), leaving out the parsed fields."""
+    path = path or OPERATION
+    out = {k: v for k, v in cfg.items() if not k.startswith('_')}
+    out['sites'] = [{k: v for k, v in s.items() if not k.startswith('_')} for s in cfg.get('sites', [])]
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path + '.tmp', 'w', encoding='utf-8') as f:
+        json.dump(out, f, ensure_ascii=False, indent=2)
+        f.write('\n')
+    os.replace(path + '.tmp', path)
+    return path
 
 
 def _minutes(text):

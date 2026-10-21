@@ -144,5 +144,10 @@ def sites(cfg=None, now=None):
     text = report.sites_report(cfg, now)
     name = cfg['_path'].replace('\\', '/').split('/')[-1]
     if name == 'operation.example.json':
-        text += '\n\nUsing the example sites. Copy\nconfig/operation.example.json to\nconfig/operation.json and edit it.'
+        text += '\n\nThese are example sites. Copy your\nsetup link, then tap Paste setup link.'
     return text
+
+
+def use_setup(text):
+    """Save the sites in a setup link or setup code as config/operation.json, and load them."""
+    return configmod.load(configmod.save(configmod.read_setup(text)))

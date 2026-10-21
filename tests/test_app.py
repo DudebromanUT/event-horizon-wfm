@@ -1,5 +1,6 @@
 """Smoke test for the Pythonista app, using the strict `ui` stand-in in pythonista_stubs/."""
 
+import base64
 import importlib
 import json
 import os
@@ -13,7 +14,9 @@ STUBS = os.path.join(ROOT, 'tests', 'pythonista_stubs')
 sys.path.insert(0, ROOT)
 sys.path.insert(0, STUBS)
 
+import clipboard  # noqa: E402
 import ui  # noqa: E402  (the stand-in, except inside Pythonista)
+from horizon import config  # noqa: E402
 
 # Inside Pythonista the real ui module wins, and this test would open the app for real.
 STAND_IN = os.path.abspath(getattr(ui, '__file__', '') or '').startswith(STUBS)
@@ -26,11 +29,15 @@ class AppTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
         horizon_app.STATE_PATH = os.path.join(self.tmp, 'state.json')
+        self.operation = config.OPERATION
+        config.OPERATION = os.path.join(self.tmp, 'config', 'operation.json')
         del ui.calls[:]
         self.app = horizon_app.main()
         ui.run_delayed()
 
     def tearDown(self):
+        config.OPERATION = self.operation
+        clipboard.text = ''
         shutil.rmtree(self.tmp)
 
     def field(self, rows, key):
@@ -86,9 +93,34 @@ class AppTest(unittest.TestCase):
         app = self.app
         app.tabs_control.pick(2)
         self.assertIn('Nairobi', app.sites_report.text)
-        refresh = app.sites_tab.items[0][0]
-        refresh.tap()
+        self.assertIn('These are example sites', app.sites_report.text)
+        app.refresh_button.tap()
         self.assertIn('in site time', app.sites_report.text)
+
+    def test_paste_setup_link(self):
+        app = self.app
+        app.tabs_control.pick(2)
+        cfg = {'sites': [{'id': 'SJO', 'name': 'San José', 'zone': 'America/Costa_Rica',
+                          'hours': {'mon-fri': '08:00-20:00'}}]}
+        code = base64.urlsafe_b64encode(json.dumps(cfg).encode()).decode().rstrip('=')
+        clipboard.text = 'https://example.github.io/event-horizon-wfm/#setup=' + code
+        app.paste_button.tap()
+        self.assertTrue(app.sites_report.text.startswith('Loaded 1 site from your setup link.'))
+        self.assertIn('San José', app.sites_report.text)
+        self.assertNotIn('example sites', app.sites_report.text)
+        with open(config.OPERATION, encoding='utf-8') as f:
+            self.assertEqual(json.load(f), cfg)
+        again = horizon_app.main()           # the next start reads the saved sites
+        self.assertIn('San José', again.sites_report.text)
+
+    def test_paste_something_else(self):
+        app = self.app
+        app.tabs_control.pick(2)
+        clipboard.text = 'Lunch at noon?'
+        app.paste_button.tap()
+        self.assertTrue(app.sites_report.text.startswith('That setup link could not be used:'))
+        self.assertIn('These are example sites', app.sites_report.text)
+        self.assertFalse(os.path.exists(config.OPERATION))
 
     def test_state_is_remembered(self):
         self.field(self.app.calc_rows, 'calls').type('150')
