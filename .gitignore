@@ -1,0 +1,8 @@
+# Your real sites, hours and costs stay on your devices.
+config/operation.json
+# Saved inputs from the Pythonista app.
+.state.json
+__pycache__/
+*.pyc
+.DS_Store
+node_modules/

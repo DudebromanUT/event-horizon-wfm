@@ -1,0 +1,41 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # 3.10 is what Pythonista runs; 3.13 is a current desktop Python.
+        python: ["3.10", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Engine, app and installer tests
+        run: python run_tests.py
+      - name: The web app's cross-check cases match the Python engine
+        run: python scripts/golden.py --check
+      - name: Generated web files are up to date
+        run: python scripts/build.py --check
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: The JavaScript engine gives the Python engine's answers
+        run: node --test tests/web/engine.test.mjs
+      - name: Install Playwright and Chromium
+        run: npm install --no-save --no-audit --no-fund playwright@1.56.1 && npx playwright install --with-deps chromium
+      - name: Click through every screen, then with the network off
+        run: node tests/browser/clickthrough.cjs

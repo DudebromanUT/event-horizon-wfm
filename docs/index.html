@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'self'; form-action 'none'; object-src 'none'">
+  <meta name="referrer" content="no-referrer">
+  <!-- preview:keep -->
+  <title>Event Horizon</title>
+  <meta name="claude:viewport-fit-sides" content="cover">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app/main.js" type="module"></script>
+  <!-- /preview:keep -->
+  <meta name="description" content="Pocket workforce management: Erlang C and A staffing, what-ifs and site clocks that work offline.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f4f6f9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0c1016" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Horizon">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+</head>
+<body>
+<!-- preview:body -->
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><ellipse class="ring" cx="16" cy="16" rx="14" ry="5.2" transform="rotate(-18 16 16)"/><circle class="core" cx="16" cy="16" r="7"/></svg>
+      <span>Event Horizon</span>
+    </div>
+    <span class="peek" id="peek" hidden></span>
+    <span class="pill" id="offline" hidden></span>
+  </header>
+
+  <div class="banner" id="update" hidden>
+    <span>A new version of Event Horizon is ready.</span>
+    <button type="button" class="btn small primary" id="update-btn">Update</button>
+  </div>
+
+  <main id="main">
+    <!-- Calc ---------------------------------------------------------------------- -->
+    <section class="screen split" id="calc" aria-labelledby="calc-title">
+      <h1 id="calc-title">Staffing for one interval</h1>
+      <div class="stick">
+        <div class="card readout" aria-live="polite">
+          <p class="eyebrow" id="calc-model">Erlang A</p>
+          <p class="hero" id="calc-hero"><span class="value num" id="calc-agents">-</span> <span class="unit">agents on the queue</span></p>
+          <dl class="kpis" id="calc-kpis">
+            <div><dt>Service level</dt><dd id="k-sl">-</dd></div>
+            <div><dt>Avg wait</dt><dd id="k-asa">-</dd></div>
+            <div><dt>Hang-ups</dt><dd id="k-ab">-</dd></div>
+            <div><dt>Occupancy</dt><dd id="k-occ">-</dd></div>
+          </dl>
+          <p class="verdict" id="calc-verdict"></p>
+          <p class="error" id="calc-error" hidden></p>
+        </div>
+        <figure class="card chart" id="cliff-card">
+          <figcaption>Service level at each staffing level. The line is your goal.</figcaption>
+          <div id="cliff"></div>
+          <div class="tip" id="cliff-tip" hidden></div>
+        </figure>
+      </div>
+
+      <div class="form-col">
+        <form class="form" id="calc-form" autocomplete="off">
+          <fieldset>
+            <legend>Demand</legend>
+            <label class="row"><span class="name">Calls per interval</span><input id="c-calls" inputmode="decimal" value="100"></label>
+            <label class="row"><span class="name">Handle time, seconds <small id="c-aht-hint">5:00 talk, hold and wrap</small></span><input id="c-aht" inputmode="numeric" value="300"></label>
+            <div class="row"><span class="name" id="c-interval-label">Interval</span>
+              <div class="seg" role="radiogroup" aria-labelledby="c-interval-label">
+                <label><input type="radio" name="c-interval" value="900"><span>15 min</span></label>
+                <label><input type="radio" name="c-interval" value="1800" checked><span>30 min</span></label>
+                <label><input type="radio" name="c-interval" value="3600"><span>60 min</span></label>
+              </div>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Goal</legend>
+            <label class="row"><span class="name">Service level</span><input id="c-sl" inputmode="decimal" value="80"><span class="suffix">%</span></label>
+            <label class="row"><span class="name">Answered within, seconds</span><input id="c-target" inputmode="numeric" value="20"></label>
+            <label class="row"><span class="name">Most hang-ups allowed <small>Blank for no limit</small></span><input id="c-maxab" inputmode="decimal" value="5"><span class="suffix">%</span></label>
+            <label class="row"><span class="name">Highest occupancy <small>Blank for no limit</small></span><input id="c-maxocc" inputmode="decimal" value="90"><span class="suffix">%</span></label>
+          </fieldset>
+          <fieldset>
+            <legend>Callers</legend>
+            <label class="row"><span class="name">Average patience, seconds <small id="c-pat-hint">How long callers wait before hanging up. Blank means nobody hangs up (Erlang C).</small></span><input id="c-pat" inputmode="numeric" value="120"></label>
+          </fieldset>
+          <fieldset>
+            <legend>Money</legend>
+            <label class="row"><span class="name">Shrinkage <small>Breaks, meetings, training, absence</small></span><input id="c-shrink" inputmode="decimal" value="35"><span class="suffix">%</span></label>
+            <label class="row"><span class="name">Cost per paid agent hour</span><input id="c-cost" inputmode="decimal" placeholder="$ optional"></label>
+            <label class="row"><span class="name">Cost of one hang-up <small>A lost sale, a missed payment, a repeat call</small></span><input id="c-abcost" inputmode="decimal" placeholder="$ optional"></label>
+          </fieldset>
+        </form>
+
+        <div class="card" id="calc-compare">
+          <h2>With and without hang-ups</h2>
+          <dl class="compare" id="calc-compare-list"></dl>
+        </div>
+        <div class="card">
+          <h2>Around the answer</h2>
+          <div class="table-wrap"><table id="calc-table">
+            <thead><tr><th scope="col">Agents</th><th scope="col">Service level</th><th scope="col">Avg wait</th><th scope="col">Hang-ups</th><th scope="col">Occupancy</th></tr></thead>
+            <tbody></tbody>
+          </table></div>
+        </div>
+        <div class="card" id="calc-money">
+          <h2>Headcount and cost</h2>
+          <dl class="compare" id="calc-money-list"></dl>
+          <p class="lede" id="calc-money-note"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- What-if ------------------------------------------------------------------- -->
+    <section class="screen" id="whatif" aria-labelledby="whatif-title" hidden>
+      <h1 id="whatif-title">What-if</h1>
+      <div class="seg full" id="w-mode" role="group" aria-label="What-if">
+        <button type="button" data-mode="ai" aria-pressed="true">AI</button>
+        <button type="button" data-mode="pool" aria-pressed="false">Pool</button>
+        <button type="button" data-mode="move" aria-pressed="false">Move</button>
+        <button type="button" data-mode="chat" aria-pressed="false">Chat</button>
+      </div>
+
+      <div class="panel" id="w-ai">
+        <p class="lede">What a bot or agent assist really saves. Containment rarely saves the same share of agents, because the calls left behind are the harder ones.</p>
+        <div class="card readout" aria-live="polite">
+          <p class="eyebrow">Agents needed</p>
+          <p class="hero arrow"><span class="from num" id="a-before">-</span> <span class="unit">to</span> <span class="value num" id="a-after">-</span> <span class="unit">agents</span></p>
+          <ul class="hbars" id="a-bars"></ul>
+          <p class="lede" id="a-note"></p>
+          <p class="error" id="a-error" hidden></p>
+        </div>
+        <form class="form" id="a-form" autocomplete="off">
+          <fieldset>
+            <legend>Today</legend>
+            <label class="row"><span class="name">Calls per interval</span><input id="a-calls" inputmode="decimal" value="100"></label>
+            <label class="row"><span class="name">Handle time, seconds</span><input id="a-aht" inputmode="numeric" value="300"></label>
+            <label class="row"><span class="name">Service level</span><input id="a-sl" inputmode="decimal" value="80"><span class="suffix">%</span></label>
+            <label class="row"><span class="name">Answered within, seconds</span><input id="a-target" inputmode="numeric" value="20"></label>
+            <label class="row"><span class="name">Average patience, seconds <small>Blank: nobody hangs up</small></span><input id="a-pat" inputmode="numeric" value=""></label>
+          </fieldset>
+          <fieldset>
+            <legend>The change</legend>
+            <label class="row"><span class="name">Bot resolves</span><input id="a-contained" inputmode="decimal" value="20"><span class="suffix">%</span></label>
+            <label class="row"><span class="name">Of those, still reach an agent <small>Within your come-back window</small></span><input id="a-recontact" inputmode="decimal" value="0"><span class="suffix">%</span></label>
+            <label class="row"><span class="name">Handle time on what is left <small>Harder calls run longer; use a minus for shorter</small></span><input id="a-ahtchange" inputmode="text" value="10"><span class="suffix">%</span></label>
+            <label class="row"><span class="name">Agent assist, seconds off every call <small>Auto-written wrap-up, faster lookups</small></span><input id="a-assist" inputmode="numeric" value="0"></label>
+            <label class="row"><span class="name">Cost per paid agent hour</span><input id="a-cost" inputmode="decimal" placeholder="$ optional"></label>
+          </fieldset>
+        </form>
+      </div>
+
+      <div class="panel" id="w-pool" hidden>
+        <p class="lede">Splitting work into smaller queues costs agents. Compare each queue answered on its own with one queue everyone answers.</p>
+        <div class="card readout" aria-live="polite">
+          <dl class="tiles" id="p-tiles">
+            <div><dt>Apart</dt><dd class="num" id="p-apart">-</dd></div>
+            <div><dt>Pooled</dt><dd class="num" id="p-pooled">-</dd></div>
+            <div class="pick"><dt>Saved</dt><dd class="num" id="p-saved">-</dd></div>
+          </dl>
+          <p class="lede" id="p-note"></p>
+          <p class="error" id="p-error" hidden></p>
+        </div>
+        <form class="form" id="p-form" autocomplete="off">
+          <fieldset id="p-queues">
+            <legend>Queues</legend>
+          </fieldset>
+          <div class="actions"><button type="button" class="btn quiet small" id="p-add">Add a queue</button></div>
+          <fieldset>
+            <legend>Goal</legend>
+            <label class="row"><span class="name">Service level</span><input id="p-sl" inputmode="decimal" value="80"><span class="suffix">%</span></label>
+            <label class="row"><span class="name">Answered within, seconds</span><input id="p-target" inputmode="numeric" value="20"></label>
+            <label class="row"><span class="name">Average patience, seconds <small>Blank: nobody hangs up</small></span><input id="p-pat" inputmode="numeric" value=""></label>
+          </fieldset>
+        </form>
+      </div>
+
+      <div class="panel" id="w-move" hidden>
+        <p class="lede">Lend agents from one queue to another for a while, such as fraud during an attack, and see both queues before and after.</p>
+        <div class="card readout" aria-live="polite">
+          <div class="table-wrap"><table id="m-table">
+            <thead><tr><th scope="col">Queue</th><th scope="col">Agents</th><th scope="col">Service level</th><th scope="col">Hang-ups</th></tr></thead>
+            <tbody></tbody>
+          </table></div>
+          <p class="error" id="m-error" hidden></p>
+        </div>
+        <form class="form" id="m-form" autocomplete="off">
+          <fieldset>
+            <legend>Lend from</legend>
+            <label class="row"><span class="name">Queue</span><input id="m-from-name" class="wide" value="Customer service"></label>
+            <label class="row"><span class="name">Calls per interval</span><input id="m-from-calls" inputmode="decimal" value="100"></label>
+            <label class="row"><span class="name">Handle time, seconds</span><input id="m-from-aht" inputmode="numeric" value="300"></label>
+            <label class="row"><span class="name">Agents on it now</span><input id="m-from-agents" inputmode="numeric" value="22"></label>
+          </fieldset>
+          <fieldset>
+            <legend>Lend to</legend>
+            <label class="row"><span class="name">Queue</span><input id="m-to-name" class="wide" value="Fraud"></label>
+            <label class="row"><span class="name">Calls per interval</span><input id="m-to-calls" inputmode="decimal" value="40"></label>
+            <label class="row"><span class="name">Handle time, seconds</span><input id="m-to-aht" inputmode="numeric" value="420"></label>
+            <label class="row"><span class="name">Agents on it now</span><input id="m-to-agents" inputmode="numeric" value="9"></label>
+          </fieldset>
+          <fieldset>
+            <legend>The move</legend>
+            <label class="row"><span class="name">Agents to lend</span><input id="m-n" inputmode="numeric" value="2"></label>
+            <label class="row"><span class="name">Their handle time there, seconds <small>Blank if they're as quick as the regulars</small></span><input id="m-borrowed" inputmode="numeric" value=""></label>
+            <label class="row"><span class="name">Service level goal</span><input id="m-sl" inputmode="decimal" value="80"><span class="suffix">%</span></label>
+            <label class="row"><span class="name">Answered within, seconds</span><input id="m-target" inputmode="numeric" value="20"></label>
+            <label class="row"><span class="name">Average patience, seconds</span><input id="m-pat" inputmode="numeric" value="180"></label>
+          </fieldset>
+        </form>
+      </div>
+
+      <div class="panel" id="w-chat" hidden>
+        <p class="lede">More chats at once only helps if handle time grows slower than concurrency. Enter the handle time you measure at each level.</p>
+        <div class="card readout" aria-live="polite">
+          <p class="eyebrow">Agents needed at each concurrency</p>
+          <ul class="hbars" id="h-bars"></ul>
+          <p class="lede" id="h-note"></p>
+          <p class="error" id="h-error" hidden></p>
+        </div>
+        <form class="form" id="h-form" autocomplete="off">
+          <fieldset>
+            <legend>Demand and goal</legend>
+            <label class="row"><span class="name">Chats per interval</span><input id="h-chats" inputmode="decimal" value="60"></label>
+            <label class="row"><span class="name">Service level</span><input id="h-sl" inputmode="decimal" value="80"><span class="suffix">%</span></label>
+            <label class="row"><span class="name">First reply within, seconds</span><input id="h-target" inputmode="numeric" value="60"></label>
+            <label class="row"><span class="name">Average patience, seconds <small>Blank: nobody leaves</small></span><input id="h-pat" inputmode="numeric" value=""></label>
+          </fieldset>
+          <fieldset>
+            <legend>Handle time per chat, seconds</legend>
+            <label class="row"><span class="name">One chat at a time</span><input id="h-aht1" inputmode="numeric" value="360"></label>
+            <label class="row"><span class="name">Two at once</span><input id="h-aht2" inputmode="numeric" value="480"></label>
+            <label class="row"><span class="name">Three at once</span><input id="h-aht3" inputmode="numeric" value="840"></label>
+            <label class="row"><span class="name">Four at once <small>Optional</small></span><input id="h-aht4" inputmode="numeric" value=""></label>
+          </fieldset>
+        </form>
+      </div>
+    </section>
+
+    <!-- Sites --------------------------------------------------------------------- -->
+    <section class="screen" id="sites" aria-labelledby="sites-title" hidden>
+      <h1 id="sites-title">Sites</h1>
+      <p class="lede" id="s-heading"></p>
+      <div class="actions"><button type="button" class="btn small" id="s-edit">Edit sites</button></div>
+      <p class="lede" id="s-example" hidden>These are example sites. Tap Edit sites to put in your own, or open your setup link.</p>
+      <div class="card flush"><ul class="clocks" id="s-grid"></ul></div>
+      <div class="card">
+        <h2 id="s-changes-title">Clock changes in the next 6 weeks</h2>
+        <ul class="changes" id="s-changes"></ul>
+      </div>
+      <div id="s-anchors" class="screen"></div>
+
+      <div class="editor" id="s-editor" hidden>
+        <div id="e-sites" class="form"></div>
+        <div class="actions">
+          <button type="button" class="btn quiet small" id="e-add">Add a site</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn small" id="e-cancel">Cancel</button>
+          <button type="button" class="btn small primary" id="e-save">Save sites</button>
+        </div>
+        <p class="error" id="e-error" hidden></p>
+        <div class="card">
+          <h2>Setup code</h2>
+          <p class="lede">Your sites as text: copy it to set up another phone, or paste one in. It stays on this device.</p>
+          <label for="e-code" class="eyebrow">Setup code</label>
+          <textarea id="e-code" spellcheck="false"></textarea>
+          <div class="actions">
+            <button type="button" class="btn small" id="e-copy">Copy code</button>
+            <button type="button" class="btn small" id="e-link">Copy setup link</button>
+            <button type="button" class="btn small" id="e-load">Use this code</button>
+            <button type="button" class="btn small danger" id="e-reset">Go back to example sites</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+</div>
+
+<nav class="tabbar" aria-label="Screens">
+  <div class="tabs">
+    <button type="button" class="tab" data-tab="calc" aria-current="page">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18v-5M11 18V7M16 18v-8M3 20.5h18"/></svg>
+      <span>Calc</span>
+    </button>
+    <button type="button" class="tab" data-tab="whatif">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4v6c0 3 2 5 5 5h9"/><path d="M15 11l4 4-4 4"/><path d="M5 20v-3"/></svg>
+      <span>What-if</span>
+    </button>
+    <button type="button" class="tab" data-tab="sites">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.6 3.6 5.4 3.6 8.5s-1.2 5.9-3.6 8.5c-2.4-2.6-3.6-5.4-3.6-8.5S9.6 6.1 12 3.5z"/></svg>
+      <span>Sites</span>
+    </button>
+  </div>
+</nav>
+<!-- /preview:body -->
+</body>
+</html>
