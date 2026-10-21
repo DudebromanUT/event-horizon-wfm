@@ -64,11 +64,29 @@ keeps it in the iOS keychain. To load your sites, copy your setup link and tap *
 on the app's Sites tab (iOS may ask to allow the paste). It saves them as `config/operation.json`,
 which updates leave alone.
 
+**Siri.** "Hey Siri, Staffing" asks three questions out loud (calls per half hour, handle time,
+goal) and says how many agents you need, with no signal. It answers by voice in plain words:
+"six hundred", "six and a half minutes", "eighty twenty". It reads back what it heard, so a
+misheard number is easy to spot, and adds the staffing that keeps occupancy under your sites'
+limit when that's higher. There is no language model in it; `staffing_shortcut.py` reads the
+answers and the engine does the math. Build the shortcut once in the Shortcuts app, after the
+Pythonista install:
+
+1. New shortcut named **Staffing**.
+2. **Ask for Input**, Number, "How many calls per half hour?", then **Set Variable** `Calls`.
+3. **Ask for Input**, Text, "Handle time?", then **Set Variable** `Handle time`.
+4. **Ask for Input**, Text, "Goal? For example, 80 20." (default answer `80/20`), then
+   **Set Variable** `Goal`.
+5. **Run Pythonista Script**: script `event-horizon/staffing_shortcut.py`, **Run in Pythonista**
+   off, and `Calls`, `Handle time` and `Goal` as the arguments (three items, or one line as
+   `Calls | Handle time | Goal`).
+6. **Show Result** with the script's result. Siri reads it aloud.
+
 ## Tests
 
 | Command | What it checks |
 |---|---|
-| `python3 run_tests.py` | The Python engine: Erlang A against a brute-force calculation and a call simulation, Erlang C against exact fractions, the built-in daylight-saving rules against the system time zone database for 2008–2036, the reports and command line, the Pythonista app against a strict stand-in for its `ui` module, and the installer. |
+| `python3 run_tests.py` | The Python engine: Erlang A against a brute-force calculation and a call simulation, Erlang C against exact fractions, the built-in daylight-saving rules against the system time zone database for 2008–2036, the reports and command line, the Pythonista app against a strict stand-in for its `ui` module, the installer, and how the Siri script reads dictated answers. |
 | `python3 scripts/golden.py --check` | `tests/web/golden.json`, Python's answers for a fixed set of cases, is up to date. |
 | `node --test tests/web/engine.test.mjs` | The web app's JavaScript gives those same answers: staffing, money, what-ifs, every time zone offset and change, opening hours, and whole Sites screens. |
 | `python3 scripts/build.py --check` | The generated `docs/sw.js` and `docs/app/defaults.js` are up to date. |
@@ -102,7 +120,7 @@ copy updates.
 | Path | What it is |
 |---|---|
 | `docs/` | The web app. `app/engine.js` and `app/clock.js` are the JavaScript engine; `app/calc.js`, `whatif.js` and `sites.js` are the screens; `sw.js` is generated. |
-| `horizon/` | The Python engine: `erlang.py`, `economics.py`, `whatif.py`, `channels.py`, `clock.py`, `config.py`, `report.py`. |
+| `horizon/` | The Python engine: `erlang.py`, `economics.py`, `whatif.py`, `channels.py`, `clock.py`, `config.py`, `report.py`, and `voice.py` for the Siri script (`staffing_shortcut.py`). |
 | `config/operation.example.json` | The example sites, which also become the web app's starting sites. Your own go in `config/operation.json` (ignored by git), which the Pythonista app writes from a setup link. |
 | `scripts/` | `build.py` (generated web files), `golden.py` (cross-check cases), `icons.cjs` (app icons). |
 | `tests/` | Python tests, `web/` cross-checks, `browser/` click-through. |
