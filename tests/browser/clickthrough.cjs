@@ -182,9 +182,22 @@ async function fill(page, selector, value) {
       .map((zone, i) => ({ id: 'S' + (i + 1), name: 'Site ' + (i + 1), zone, hours: { 'mon-fri': '08:00-20:00' } })) };
   await page.fill('#e-code', JSON.stringify(seven));
   await page.click('#e-load');
-  await until(page, '#toast', 'Sites loaded from the setup code.');
+  await until(page, '#toast', 'Sites loaded.');
   assert.equal(await page.locator('#s-grid .clock').count(), 7);
   await until(page, '#s-anchors', 'S7');
+
+  step('A pasted setup link works too (Home Screen apps keep their own storage on iPhone)');
+  await page.click('#s-edit');
+  const pasted = await page.evaluate(() => {
+    const json = JSON.stringify({ sites: [{ id: 'MNL', name: 'Manila', zone: 'Asia/Manila', hours: { daily: '24h' } },
+      { id: 'LIM', name: 'Lima', zone: 'America/Lima', hours: { 'mon-fri': '08:00-18:00' } }] });
+    const bytes = new TextEncoder().encode(json);
+    return 'https://example.test/app/#setup=' + btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  });
+  await page.fill('#e-code', pasted);
+  await page.click('#e-load');
+  assert.equal(await page.locator('#s-grid .clock').count(), 2);
+  await until(page, '#s-grid', 'Lima');
 
   step('A setup link loads sites on another device');
   const link = await page.evaluate(() => {

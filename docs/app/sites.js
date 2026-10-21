@@ -293,7 +293,10 @@ export function init() {
   });
   $('#e-load').addEventListener('click', () => {
     try {
-      use(JSON.parse($('#e-code').value), 'Sites loaded from the setup code.');
+      // Takes a setup code (the text above) or a whole setup link.
+      const raw = $('#e-code').value.trim();
+      const at = raw.indexOf('#setup=');
+      use(at >= 0 ? decode(raw.slice(at + 7)) : JSON.parse(raw), 'Sites loaded.');
       closeEditor();
     } catch (e) {
       showError('e-error', new RangeError('That setup code could not be used: ' + (e.message || e)));
