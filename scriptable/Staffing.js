@@ -185,7 +185,8 @@ function replySentence(text, interval = 1800, maxOccupancy = 0) {
   return answer(parts[0], parts[1], parts[2], parts[3], interval, maxOccupancy);
 }
 
-if (typeof module !== 'undefined' && module.exports) {
+// Scriptable has its own `module` object too, so tell the two apart by Scriptable's `Script`.
+if (typeof Script === 'undefined') {
   module.exports = { numbers, parseHandleTime, parseGoal, splitSentence, answer, replySentence };
 } else {
   // Scriptable. The answer is set before anything asynchronous, so Shortcuts always gets it.
