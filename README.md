@@ -64,23 +64,19 @@ keeps it in the iOS keychain. To load your sites, copy your setup link and tap *
 on the app's Sites tab (iOS may ask to allow the paste). It saves them as `config/operation.json`,
 which updates leave alone.
 
-**Siri.** "Hey Siri, Staffing" asks three questions out loud (calls per half hour, handle time,
-goal) and says how many agents you need, with no signal. It answers by voice in plain words:
-"six hundred", "six and a half minutes", "eighty twenty". It reads back what it heard, so a
-misheard number is easy to spot, and adds the staffing that keeps occupancy under your sites'
-limit when that's higher. There is no language model in it; `staffing_shortcut.py` reads the
-answers and the engine does the math. Build the shortcut once in the Shortcuts app, after the
-Pythonista install:
+**Siri.** "Hey Siri, Staffing" asks one question and says how many agents you need, with no
+signal. Answer in one breath, in order: calls per half hour, handle time, goal, such as "600, six
+minutes, eighty twenty" (leave the goal off for 80/20). Digits or words both work. It reads back
+what it heard, so a misheard number is easy to spot, and adds the staffing that keeps occupancy
+under your sites' limit when that's higher. There is no language model in it; `staffing_shortcut.py`
+reads the answer and the engine does the math. Build the shortcut once, after the Pythonista
+install:
 
-1. New shortcut named **Staffing**.
-2. **Ask for Input**, Number, "How many calls per half hour?", then **Set Variable** `Calls`.
-3. **Ask for Input**, Text, "Handle time?", then **Set Variable** `Handle time`.
-4. **Ask for Input**, Text, "Goal? For example, 80 20." (default answer `80/20`), then
-   **Set Variable** `Goal`.
-5. **Run Pythonista Script**: script `event-horizon/staffing_shortcut.py`, **Run in Pythonista**
-   off, and `Calls`, `Handle time` and `Goal` as the arguments (three items, or one line as
-   `Calls | Handle time | Goal`).
-6. **Show Result** with the script's result. Siri reads it aloud.
+1. In Shortcuts, tap **+** and add **Ask for Input**: Text, prompt "Calls, handle time and goal?".
+2. Add **Run Pythonista Script**: script `event-horizon/staffing_shortcut.py`. In Arguments, pick
+   **Provided Input**. Under the arrow, turn **Run in Pythonista** and **Show When Run** off.
+3. Add **Show Result**. It fills in the script's result; Siri reads it aloud.
+4. Name the shortcut **Staffing**.
 
 ## Tests
 

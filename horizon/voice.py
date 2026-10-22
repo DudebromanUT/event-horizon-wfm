@@ -172,3 +172,34 @@ def reply(calls_text, aht_text, goal_text, interval=1800, max_occupancy=None):
             return 'I didn\'t catch %s I heard "%s".' % (HINTS[field], text.strip())
     percent, target = parse_goal(goal_text)
     return answer(parse_calls(calls_text), parse_handle_time(aht_text), percent, target, interval, max_occupancy)
+
+
+def split_sentence(text):
+    """One answer with everything in it, in the order asked: '600, 6 minutes, 80 20' ->
+    ('600', '360 seconds', '80/20'). Without a goal ('600, 6:30') the goal is 80/20."""
+    text = re.sub(r'(\d+):(\d{2})', lambda m: ' %d seconds ' % (int(m.group(1)) * 60 + int(m.group(2))), text)
+    found = numbers(text)
+    if len(found) < 2:
+        raise ValueError('sentence')
+    if found[-1][1]:
+        goal = (80.0, 20.0)
+        middle = found[1:]
+    elif found[-1][0].is_integer() and found[-1][0] >= 100 and len(found) >= 3:
+        goal = parse_goal(num(found[-1][0]))
+        middle = found[1:-1]
+    elif len(found) >= 4:
+        goal = (found[-2][0], found[-1][0])
+        middle = found[1:-2]
+    else:
+        raise ValueError('sentence')
+    words = ' '.join('%s %s' % (num(n), unit or '') for n, unit in middle)
+    return num(found[0][0]), '%s seconds' % num(parse_handle_time(words)), '%s/%s' % (num(goal[0]), num(goal[1]))
+
+
+def reply_sentence(text, interval=1800, max_occupancy=None):
+    try:
+        parts = split_sentence(text)
+    except ValueError:
+        return ('I didn\'t catch that. Say calls, handle time and goal, like: 600, 6 minutes, 80 20. '
+                'I heard "%s".' % text.strip())
+    return reply(*parts, interval=interval, max_occupancy=max_occupancy)

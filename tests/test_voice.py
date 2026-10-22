@@ -90,6 +90,25 @@ class ReplyTest(unittest.TestCase):
         self.assertTrue(voice.reply('600', '6:00', '80').startswith('I didn\'t catch the goal.'))
 
 
+class SentenceTest(unittest.TestCase):
+    def test_one_answer_with_everything(self):
+        for text, expected in [('600, 6 minutes, 80 20', ('600', '360 seconds', '80/20')),
+                               ('six hundred calls, six and a half minutes, eighty twenty',
+                                ('600', '390 seconds', '80/20')),
+                               ('600 6:30 8020', ('600', '390 seconds', '80/20')),
+                               ('600 360 80 20', ('600', '360 seconds', '80/20')),
+                               ('600, 6 minutes', ('600', '360 seconds', '80/20')),
+                               ('600 6 minutes 30 seconds 90 30', ('600', '390 seconds', '90/30'))]:
+            self.assertEqual(voice.split_sentence(text), expected, text)
+        for bad in ('hello', '600', '600 80 20'):
+            with self.assertRaises(ValueError):
+                voice.split_sentence(bad)
+
+    def test_reply(self):
+        self.assertIn('You need 129 agents.', voice.reply_sentence('600, 6 minutes, 80 20'))
+        self.assertTrue(voice.reply_sentence('hello').startswith('I didn\'t catch that.'))
+
+
 class ScriptTest(unittest.TestCase):
     def run_script(self, *args, stdin=None):
         out = subprocess.run([sys.executable, os.path.join(ROOT, 'staffing_shortcut.py')] + list(args),
@@ -105,6 +124,18 @@ class ScriptTest(unittest.TestCase):
     def test_one_argument_split_by_bars_or_lines(self):
         self.assertIn('You need 129 agents.', self.run_script('600 | 6 minutes | 80/20'))
         self.assertIn('You need 129 agents.', self.run_script('600\n6:00\n8020'))
+
+    def test_one_sentence(self):
+        self.assertIn('You need 129 agents.', self.run_script('600, 6 minutes, 80 20'))
+
+    def test_input_file(self):
+        import tempfile
+        with tempfile.NamedTemporaryFile('w', suffix='.txt', delete=False) as f:
+            f.write('600, 6 minutes, 80 20')
+        try:
+            self.assertIn('You need 129 agents.', self.run_script(f.name))
+        finally:
+            os.remove(f.name)
 
     def test_typed_in_pythonista(self):
         self.assertIn('You need 129 agents.', self.run_script(stdin='600\n6 minutes\n80/20\n'))
