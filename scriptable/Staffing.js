@@ -188,35 +188,33 @@ function replySentence(text, interval = 1800, maxOccupancy = 0) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { numbers, parseHandleTime, parseGoal, splitSentence, answer, replySentence };
 } else {
-  // Scriptable: the answer from the shortcut, or typed in when run in the app.
-  const run = async () => {
-    let text = args.shortcutParameter || (args.plainTexts && args.plainTexts[0]) || '';
-    if (Array.isArray(text)) text = text.join(' ');
-    if (!String(text).trim() && config.runsInApp) {
-      const ask = new Alert();
-      ask.title = 'Calls, handle time and goal?';
-      ask.addTextField('600, 6 minutes, 80 20');
-      ask.addAction('Answer');
-      await ask.present();
-      text = ask.textFieldValue(0);
-    }
-    const reply = replySentence(String(text), INTERVAL_MINUTES * 60, MAX_OCCUPANCY);
+  // Scriptable. The answer is set before anything asynchronous, so Shortcuts always gets it.
+  let text = args.shortcutParameter || (args.plainTexts && args.plainTexts[0]) || '';
+  if (Array.isArray(text)) text = text.join(' ');
+  const finish = (reply) => {
     Script.setShortcutOutput(reply);
     if (config.runsWithSiri) Speech.speak(reply);
-    if (!config.runsInApp) {
-      // Shown as a notification, so the shortcut needs no step after this one.
-      const note = new Notification();
-      note.title = 'Staffing';
-      note.body = reply;
-      await note.schedule();
-    } else {
+    if (config.runsInApp) {
       const show = new Alert();
       show.title = 'Staffing';
       show.message = reply;
       show.addAction('OK');
-      await show.present();
+      show.present().then(() => Script.complete());
+    } else {
+      // Shown as a notification, so the shortcut needs no step after this one.
+      const note = new Notification();
+      note.title = 'Staffing';
+      note.body = reply;
+      note.schedule().then(() => Script.complete(), () => Script.complete());
     }
-    Script.complete();
   };
-  run();
+  if (String(text).trim() || !config.runsInApp) {
+    finish(replySentence(String(text), INTERVAL_MINUTES * 60, MAX_OCCUPANCY));
+  } else {
+    const ask = new Alert();
+    ask.title = 'Calls, handle time and goal?';
+    ask.addTextField('600, 6 minutes, 80 20');
+    ask.addAction('Answer');
+    ask.present().then(() => finish(replySentence(ask.textFieldValue(0), INTERVAL_MINUTES * 60, MAX_OCCUPANCY)));
+  }
 }
