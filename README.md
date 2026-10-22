@@ -68,15 +68,19 @@ which updates leave alone.
 signal. Answer in one breath, in order: calls per half hour, handle time, goal, such as "600, six
 minutes, eighty twenty" (leave the goal off for 80/20). Digits or words both work. It reads back
 what it heard, so a misheard number is easy to spot, and adds the staffing that keeps occupancy
-under your sites' limit when that's higher. There is no language model in it; `staffing_shortcut.py`
-reads the answer and the engine does the math. Build the shortcut once, after the Pythonista
-install:
+under 90% when that's higher. There is no language model in it. It runs in the free Scriptable
+app, because Pythonista's Shortcuts action fails on current iOS ("There was a problem
+communicating with the app"):
 
-1. In Shortcuts, tap **+** and add **Ask for Input**: Text, prompt "Calls, handle time and goal?".
-2. Add **Run Pythonista Script**: script `event-horizon/staffing_shortcut.py`. In Arguments, pick
-   **Provided Input**. Under the arrow, turn **Run in Pythonista** and **Show When Run** off.
-3. Add **Show Result**. It fills in the script's result; Siri reads it aloud.
-4. Name the shortcut **Staffing**.
+1. Save `scriptable/Staffing.js` into iCloud Drive → Scriptable (or paste it into a new Scriptable
+   script named **Staffing**).
+2. In Shortcuts, make a shortcut named **Staffing**: **Ask for Input** (Text, "Calls, handle time
+   and goal?"), then Scriptable's **Run Script** with script **Staffing**, parameter **Provided
+   Input**, and Run In App off.
+
+The answer appears as a notification, and Siri says it aloud. `staffing_shortcut.py` does the same
+in Pythonista (type the answer when you run it), and `tests/test_scriptable.py` checks the two give
+identical answers.
 
 ## Tests
 
@@ -116,7 +120,7 @@ copy updates.
 | Path | What it is |
 |---|---|
 | `docs/` | The web app. `app/engine.js` and `app/clock.js` are the JavaScript engine; `app/calc.js`, `whatif.js` and `sites.js` are the screens; `sw.js` is generated. |
-| `horizon/` | The Python engine: `erlang.py`, `economics.py`, `whatif.py`, `channels.py`, `clock.py`, `config.py`, `report.py`, and `voice.py` for the Siri script (`staffing_shortcut.py`). |
+| `horizon/` | The Python engine: `erlang.py`, `economics.py`, `whatif.py`, `channels.py`, `clock.py`, `config.py`, `report.py`, and `voice.py` for the Siri script (`scriptable/Staffing.js`, `staffing_shortcut.py`). |
 | `config/operation.example.json` | The example sites, which also become the web app's starting sites. Your own go in `config/operation.json` (ignored by git), which the Pythonista app writes from a setup link. |
 | `scripts/` | `build.py` (generated web files), `golden.py` (cross-check cases), `icons.cjs` (app icons). |
 | `tests/` | Python tests, `web/` cross-checks, `browser/` click-through. |
