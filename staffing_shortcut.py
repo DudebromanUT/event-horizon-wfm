@@ -31,7 +31,7 @@ def answers(argv):
         if os.path.isabs(a) and os.path.isfile(a):
             with open(a, encoding='utf-8', errors='replace') as f:
                 a = f.read()
-        if a.strip():
+        if a.strip() and a.strip() not in [p.strip() for p in parts]:   # the same answer sent twice counts once
             parts.append(a)
     if len(parts) == 1:
         parts = [p for p in parts[0].replace('|', '\n').split('\n') if p.strip()]

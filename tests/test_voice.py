@@ -134,6 +134,8 @@ class ScriptTest(unittest.TestCase):
             f.write('600, 6 minutes, 80 20')
         try:
             self.assertIn('You need 129 agents.', self.run_script(f.name))
+            # Shortcuts can pass the same answer as an argument and as an input file.
+            self.assertIn('You need 129 agents.', self.run_script('600, 6 minutes, 80 20', f.name))
         finally:
             os.remove(f.name)
 
